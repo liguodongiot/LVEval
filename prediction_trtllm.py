@@ -50,23 +50,18 @@ def get_pred(
             half = int(max_length / 2)
             prompt = tokenizer.decode(tokenized_prompt[:half]) + tokenizer.decode(tokenized_prompt[-half:])
 
+        text_input = "<|im_start|>system\nYou are a helpful assistant<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n".format(prompt)
         payload = {
-            "model": model_id,
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": "You are a helpful assistant."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": max_gen,
-            "top_p": 0.95,
-            "seed": 100,
-            "temperature": 0.8,
-            "stream": False
+            "text_input": text_input,
+            "parameters": {
+                "max_tokens": max_gen,
+                "bad_words": [""],
+                "stop_words": [""],
+                "top_p": 0.95,
+                "temperature": 0.8, 
+                "random_seed": 100,
+                "return_log_probs": False
+            }
         }
         # print(payload)
         headers = {"content-type": "application/json"}
@@ -75,7 +70,7 @@ def get_pred(
         print("\n---------\n",response.text)
 
         response_json = json.loads(response.text)
-        pred = response_json["choices"][0]["message"]["content"]
+        pred = response_json["text_output"]
         item = {
             "pred": pred,
             "answers": json_obj["answers"],
@@ -130,6 +125,8 @@ if __name__ == "__main__":
     ensure_dir(args.output_dir)
     # datasets = get_dataset_names(DATASET_SELECTED, DATASET_LENGTH_LEVEL)
     # datasets = get_dataset_names(['cmrc_mixup'], ['16k'])
-    datasets = get_dataset_names(['cmrc_mixup'], ['16k','32k','64k','128k'])
+    # datasets = get_dataset_names(['cmrc_mixup'], ['16k','32k','64k','128k'])
+    datasets = get_dataset_names(['cmrc_mixup'], ['16k','32k'])
+
     single_processing(datasets, args)
   

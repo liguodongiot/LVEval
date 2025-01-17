@@ -3,7 +3,6 @@ import re
 import tiktoken
 import argparse
 from tqdm import tqdm
-from openai import OpenAI
 import requests
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import json
@@ -43,6 +42,7 @@ def get_pred(
         if json_obj['input'] in existed_questions:
             print(f'pred already exists in {save_path}, jump...')
             continue
+        
         prompt = prompt_format.format(**json_obj)
         # following LongBench, we truncate to fit max_length
         tokenized_prompt = tokenizer.encode(prompt)
@@ -50,40 +50,15 @@ def get_pred(
             half = int(max_length / 2)
             prompt = tokenizer.decode(tokenized_prompt[:half]) + tokenizer.decode(tokenized_prompt[-half:])
 
-        payload = {
-            "model": model_id,
-            "messages": [
-                {
-                    "role": "system", 
-                    "content": "You are a helpful assistant."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "max_tokens": max_gen,
-            "top_p": 0.95,
-            "seed": 100,
-            "temperature": 0.8,
-            "stream": False
-        }
-        # print(payload)
-        headers = {"content-type": "application/json"}
-        response = requests.request("POST", url, json=payload, headers=headers)
-
-        print("\n---------\n",response.text)
-
-        response_json = json.loads(response.text)
-        pred = response_json["choices"][0]["message"]["content"]
         item = {
-            "pred": pred,
+            "text": prompt,
             "answers": json_obj["answers"],
             "gold_ans": json_obj["answer_keywords"] if "answer_keywords" in json_obj else None,
             "input": json_obj["input"],
             "all_classes": json_obj["all_classes"] if "all_classes" in json_obj else None,
             "length": json_obj["length"],
         }
+
         dump_preds_results_once(item, save_path)
         preds.append(item)
     return preds
@@ -91,7 +66,7 @@ def get_pred(
 def single_processing(datasets, args):
     model_id = args.model_name
     if 'qwen' in model_id:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+        tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
     
     for dataset in tqdm(datasets):
         datas = load_LVEval_dataset(dataset, args.data_path)
@@ -101,7 +76,7 @@ def single_processing(datasets, args):
         prompt_format = DATASET_PROMPT[dataset_name]
         max_gen = DATASET_MAXGEN[dataset_name]
         save_path = os.path.join(args.output_dir, dataset + ".jsonl")
-        preds = get_pred(
+        get_pred(
             args.url,
             tokenizer,
             datas,
